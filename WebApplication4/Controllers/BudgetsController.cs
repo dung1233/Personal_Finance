@@ -128,6 +128,46 @@ namespace WebApplication4.Controllers
             var budgets = await _budgetService.CreateBudgetsFromTemplateAsync(userId.Value, dto);
             return Ok(budgets);
         }
+        [HttpPut("bulk")]
+        public async Task<IActionResult> UpdateBudgetsBulk([FromBody] List<BudgetUpdateDto> budgets)
+        {
+            var userId = GetUserIdFromClaims();
+
+            if (userId == null)
+            {
+                return Unauthorized("User not authenticated");
+            }
+
+            await _budgetService.UpdateBudgetsBulkAsync(userId.Value, budgets);
+            return Ok("Cập nhật thành công"); // Fixed the issue by directly passing the string message.
+        }
+        [HttpGet("alerts")]
+        public async Task<IActionResult> GetBudgetAlerts()
+        {
+            var userId = GetUserIdFromClaims();
+            if (userId == null)
+            {
+                return Unauthorized("User not authenticated");
+            }
+
+            // DEBUG: Log userId
+            Console.WriteLine($"UserId from claims: {userId.Value}");
+
+            var result = await _budgetService.GetBudgetAlertsAsync(userId.Value);
+            return Ok(result);
+        }
+        [HttpGet("categories/{categoryId}")]
+        public async Task<IActionResult> GetBudgetsByCategory(int categoryId)
+        {
+            var userId = GetUserIdFromClaims();
+            if (userId == null)
+            {
+                return Unauthorized("User not authenticated");
+            }
+            var budgets = await _budgetService.GetBudgetsByCategoryAsync(userId.Value, categoryId);
+            return Ok(budgets);
+        }
+
 
 
 

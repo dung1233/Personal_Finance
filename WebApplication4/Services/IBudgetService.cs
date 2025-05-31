@@ -13,6 +13,11 @@ namespace WebApplication4.Services
         Task<List<BudgetSummaryDto>> GetBudgetSummaryAsync(int userId);
         Task<List<BudgetPerformanceDto>> GetBudgetPerformanceAsync(int userId);
         Task<List<BudgetDto>> CreateBudgetsFromTemplateAsync(int userId, BudgetTemplateRequestDto dto);
+        Task<List<BudgetDto>> UpdateBudgetsBulkAsync(int userId, List<BudgetUpdateDto> budgets);
+        Task<List<BudgetAlertDto>> GetBudgetAlertsAsync(int userId);
+
+        Task<List<BudgetDto>> GetBudgetsByCategoryAsync(int userId, int categoryId);
+
 
     }
 

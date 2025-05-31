@@ -284,10 +284,100 @@ namespace WebApplication4.Services
             }).ToList();
         }
 
+        public async Task<List<BudgetDto>> UpdateBudgetsBulkAsync(int userId, List<BudgetUpdateDto> budgets)
+        {
+            var budgetIds = budgets.Select(b => b.BudgetId).ToList();
+            var userBudgets = await _context.Budgets
+                .Where(b => budgetIds.Contains(b.BudgetId) && b.UserId == userId)
+                .ToListAsync();
+
+            var updatedBudgets = new List<BudgetDto>();
+
+            foreach (var b in userBudgets)
+            {
+                var update = budgets.FirstOrDefault(x => x.BudgetId == b.BudgetId);
+                if (update == null) continue;
+
+                b.BudgetAmount = update.BudgetAmount;
+                b.AlertThreshold = update.AlertThreshold;
+                b.IsActive = update.IsActive;
+                b.UpdatedAt = DateTime.UtcNow; // Nên dùng UtcNow
+
+                // Add to result
+                updatedBudgets.Add(new BudgetDto
+                {
+                    BudgetId = b.BudgetId,
+                    BudgetName = b.BudgetName,
+                    BudgetAmount = b.BudgetAmount,
+                    BudgetPeriod = b.BudgetPeriod,
+                    StartDate = b.StartDate,
+                    EndDate = b.EndDate,
+                    SpentAmount = b.SpentAmount,
+                    AlertThreshold = b.AlertThreshold,
+                    IsActive = b.IsActive,
+                    CategoryId = b.CategoryId
+                });
+            }
+
+            await _context.SaveChangesAsync();
+            return updatedBudgets;
+        }
+
+        public async Task<List<BudgetAlertDto>> GetBudgetAlertsAsync(int userId)
+        {
+            var today = DateTime.Now.Date; // Chỉ lấy ngày, bỏ giờ phút giây
+
+            Console.WriteLine($"Today (Date only): {today}");
+
+            var alerts = await _context.Budgets
+                .Where(b => b.UserId == userId &&
+                            b.IsActive &&
+                            b.StartDate <= today &&
+                            b.EndDate >= today && // Bây giờ sẽ so sánh 31/05/2025 00:00:00 >= 31/05/2025 00:00:00 = TRUE
+                            (b.SpentAmount * 100m) / b.BudgetAmount >= b.AlertThreshold)
+                .Select(b => new BudgetAlertDto
+                {
+                    BudgetId = b.BudgetId,
+                    BudgetName = b.BudgetName,
+                    BudgetAmount = b.BudgetAmount,
+                    SpentAmount = b.SpentAmount,
+                    AlertThreshold = b.AlertThreshold,
+                    PercentageSpent = Math.Round((double)((b.SpentAmount * 100m) / b.BudgetAmount), 2)
+                })
+                .ToListAsync();
+
+            return alerts;
+        }
+        public async Task<List<BudgetDto>> GetBudgetsByCategoryAsync(int userId, int categoryId)
+        {
+            var budgets = await _context.Budgets
+                .Where(b => b.UserId == userId && b.CategoryId == categoryId && b.IsActive)
+                .Select(b => new BudgetDto
+                {
+                    BudgetId = b.BudgetId,
+                    BudgetName = b.BudgetName,
+                    BudgetAmount = b.BudgetAmount,
+                    BudgetPeriod = b.BudgetPeriod,
+                    StartDate = b.StartDate,
+                    EndDate = b.EndDate,
+                    SpentAmount = b.SpentAmount,
+                    AlertThreshold = b.AlertThreshold,
+                    IsActive = b.IsActive,
+                    CategoryId = b.CategoryId
+                })
+                .ToListAsync();
+
+            return budgets;
+        }
+
+
+
+
 
 
 
 
     }
+
 
 }
