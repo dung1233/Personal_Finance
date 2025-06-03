@@ -101,10 +101,13 @@ namespace WebApplication4.Controllers
                 claims.Add(new Claim(ClaimTypes.Role, user.Role.Name));
             }
 
+            // Lấy ExpireMinutes dưới dạng int thay vì string
+            int expireMinutes = jwtSettings.GetValue<int>("ExpireMinutes");
+
             var tokenDescriptor = new SecurityTokenDescriptor
             {
                 Subject = new ClaimsIdentity(claims),
-                Expires = DateTime.UtcNow.AddMinutes(double.Parse(jwtSettings["ExpireMinutes"])),
+                Expires = DateTime.UtcNow.AddMinutes(expireMinutes),
                 Issuer = jwtSettings["Issuer"],
                 Audience = jwtSettings["Audience"],
                 SigningCredentials = new SigningCredentials(
@@ -116,6 +119,7 @@ namespace WebApplication4.Controllers
             var token = tokenHandler.CreateToken(tokenDescriptor);
             return tokenHandler.WriteToken(token);
         }
+
 
         [Authorize]
         [HttpGet("me")]
