@@ -83,7 +83,6 @@ namespace WebApplication4.Controllers
             return Ok(new { token });
         }
 
-
         private string GenerateJwtToken(User user)
         {
             var jwtSettings = _configuration.GetSection("Jwt");
@@ -101,8 +100,12 @@ namespace WebApplication4.Controllers
                 claims.Add(new Claim(ClaimTypes.Role, user.Role.Name));
             }
 
-            // Lấy ExpireMinutes dưới dạng int thay vì string
-            int expireMinutes = jwtSettings.GetValue<int>("ExpireMinutes");
+            // Cách 1: Sử dụng GetValue với default value
+            var expireMinutes = _configuration.GetValue<double>("Jwt:ExpireMinutes", 60);
+
+            // Hoặc Cách 2: Kiểm tra null trước khi parse
+            // var expireMinutesString = jwtSettings["ExpireMinutes"];
+            // var expireMinutes = string.IsNullOrEmpty(expireMinutesString) ? 60 : double.Parse(expireMinutesString);
 
             var tokenDescriptor = new SecurityTokenDescriptor
             {
