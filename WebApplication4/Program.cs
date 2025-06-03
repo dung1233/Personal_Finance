@@ -53,12 +53,10 @@ builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
 
-// 👉 4. Middleware pipeline
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
+// Bỏ điều kiện if, cho phép Swagger chạy luôn
+// Xóa điều kiện if, để Swagger luôn chạy
+app.UseSwagger();
+app.UseSwaggerUI();
 
 app.UseHttpsRedirection();
 
