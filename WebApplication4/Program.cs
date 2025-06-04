@@ -17,23 +17,9 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 // 👉 2. Cấu hình JWT
 var jwtSettings = builder.Configuration.GetSection("Jwt");
 var key = Encoding.ASCII.GetBytes(jwtSettings["Key"]);
-
 builder.Services.AddScoped<IAccountService, AccountService>();
 builder.Services.AddScoped<TransactionService>();
 builder.Services.AddScoped<IBudgetService, BudgetService>();
-
-// 👉 Cấu hình CORS
-builder.Services.AddCors(options =>
-{
-    options.AddPolicy("AllowAll", policy =>
-    {
-        policy.AllowAnyOrigin()
-              .AllowAnyMethod()
-              .AllowAnyHeader();
-    });
-});
-
-// 👉 3. Authentication
 builder.Services.AddAuthentication(options =>
 {
     options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
@@ -58,25 +44,23 @@ builder.Services.AddAuthentication(options =>
         ClockSkew = TimeSpan.Zero
     };
 });
+//builder.Services.AddScoped<AccountService, AccountService>();
 
+// 👉 3. Add Controllers & Swagger
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
 
-// 👉 Swagger
+// Bỏ điều kiện if, cho phép Swagger chạy luôn
+// Xóa điều kiện if, để Swagger luôn chạy
 app.UseSwagger();
 app.UseSwaggerUI();
 
-app.MapGet("/", () => Results.Ok("API is running!"));
-
-// 👉 Enable CORS
-app.UseCors("AllowAll");
-
-// 👉 Security
 app.UseHttpsRedirection();
-app.UseAuthentication();
+
+app.UseAuthentication(); // ⚠️ Authentication trước Authorization
 app.UseAuthorization();
 
 app.MapControllers();
