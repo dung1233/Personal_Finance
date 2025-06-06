@@ -1,4 +1,4 @@
-﻿using BCrypt.Net;
+﻿    using BCrypt.Net;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -20,7 +20,7 @@ namespace WebApplication4.Controllers
 
         public AuthController(AppDbContext context, IConfiguration configuration)
         {
-            _context = context;
+            _context = context;     
             _configuration = configuration;
         }
 

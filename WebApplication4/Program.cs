@@ -47,10 +47,14 @@ builder.Services.AddAuthentication(options =>
 //builder.Services.AddScoped<AccountService, AccountService>();
 
 // 👉 3. Add Controllers & Swagger
+builder.Services.AddScoped<IDashboardService, DashboardService>();
+
+builder.Services.AddScoped<IDashboardService, DashboardService>();
+builder.Services.AddScoped<IBudgetService, BudgetService>();
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
-
+builder.Services.AddScoped<IGoalService, GoalService>();
 var app = builder.Build();
 
 // Bỏ điều kiện if, cho phép Swagger chạy luôn
