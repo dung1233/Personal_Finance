@@ -167,6 +167,35 @@ namespace WebApplication4.Controllers
             var budgets = await _budgetService.GetBudgetsByCategoryAsync(userId.Value, categoryId);
             return Ok(budgets);
         }
+        [HttpGet("account-balance-alerts")]
+        public async Task<IActionResult> GetAccountBalanceAlerts()
+        {
+            var userId = GetUserIdFromClaims();
+            if (userId == null) return Unauthorized();
+
+            var alerts = await _budgetService.GetAccountBalanceAlertsAsync(userId.Value);
+            return Ok(alerts);
+        }
+
+        [HttpPost("check-feasibility")]
+        public async Task<IActionResult> CheckBudgetFeasibility([FromBody] CreateBudgetDto dto)
+        {
+            var userId = GetUserIdFromClaims();
+            if (userId == null) return Unauthorized();
+
+            var result = await _budgetService.CheckBudgetFeasibilityAsync(userId.Value, dto);
+            return Ok(result);
+        }
+
+        [HttpGet("financial-overview")]
+        public async Task<IActionResult> GetFinancialOverview()
+        {
+            var userId = GetUserIdFromClaims();
+            if (userId == null) return Unauthorized();
+
+            var overview = await _budgetService.GetFinancialOverviewAsync(userId.Value);
+            return Ok(overview);
+        }
 
 
 

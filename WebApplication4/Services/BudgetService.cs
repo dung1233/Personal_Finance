@@ -2,6 +2,7 @@
 using WebApplication4.Dtos;
 using WebApplication4.Models;
 using Microsoft.EntityFrameworkCore;
+
 namespace WebApplication4.Services
 {
     public class BudgetService : IBudgetService
@@ -13,14 +14,11 @@ namespace WebApplication4.Services
             _context = context;
         }
 
-
         public async Task<BudgetDto?> CreateBudgetAsync(int userId, CreateBudgetDto dto)
         {
-            // Validate: Ngày không hợp lệ
             if (dto.StartDate >= dto.EndDate)
                 return null;
 
-            // Check trùng kỳ ngân sách cùng category
             var isOverlap = await _context.Budgets.AnyAsync(b =>
                 b.UserId == userId &&
                 b.CategoryId == dto.CategoryId &&
@@ -64,6 +62,7 @@ namespace WebApplication4.Services
                 CategoryId = budget.CategoryId
             };
         }
+
         public async Task<IEnumerable<BudgetDto>> GetBudgetsAsync(int userId)
         {
             var budgets = await _context.Budgets
@@ -84,6 +83,7 @@ namespace WebApplication4.Services
                 CategoryId = b.CategoryId
             });
         }
+
         public async Task<BudgetDto?> GetBudgetByIdAsync(int userId, int budgetId)
         {
             var budget = await _context.Budgets
@@ -105,16 +105,15 @@ namespace WebApplication4.Services
                 CategoryId = budget.CategoryId
             };
         }
+
         public async Task<BudgetDto?> UpdateBudgetAsync(int userId, int budgetId, UpdateBudgetDto dto)
         {
             var budget = await _context.Budgets.FirstOrDefaultAsync(b => b.BudgetId == budgetId && b.UserId == userId);
             if (budget == null) return null;
 
-            // Validate ngày
             if (dto.StartDate >= dto.EndDate)
                 return null;
 
-            // Kiểm tra trùng kỳ
             var isOverlap = await _context.Budgets.AnyAsync(b =>
                 b.BudgetId != budgetId &&
                 b.UserId == userId &&
@@ -126,7 +125,6 @@ namespace WebApplication4.Services
             if (isOverlap)
                 return null;
 
-            // Update fields
             budget.BudgetName = dto.BudgetName;
             budget.BudgetAmount = dto.BudgetAmount;
             budget.BudgetPeriod = dto.BudgetPeriod;
@@ -163,6 +161,7 @@ namespace WebApplication4.Services
             await _context.SaveChangesAsync();
             return true;
         }
+
         public async Task<List<BudgetDto>> GetCurrentBudgetsAsync(int userId)
         {
             var today = DateTime.UtcNow.Date;
@@ -189,6 +188,7 @@ namespace WebApplication4.Services
 
             return budgets;
         }
+
         public async Task<List<BudgetSummaryDto>> GetBudgetSummaryAsync(int userId)
         {
             var budgets = await _context.Budgets
@@ -207,6 +207,7 @@ namespace WebApplication4.Services
 
             return summaries;
         }
+
         public async Task<List<BudgetPerformanceDto>> GetBudgetPerformanceAsync(int userId)
         {
             var today = DateTime.Today;
@@ -248,6 +249,7 @@ namespace WebApplication4.Services
 
             return result;
         }
+
         public async Task<List<BudgetDto>> CreateBudgetsFromTemplateAsync(int userId, BudgetTemplateRequestDto dto)
         {
             var budgets = dto.Templates.Select(t => new Budget
@@ -255,7 +257,7 @@ namespace WebApplication4.Services
                 UserId = userId,
                 CategoryId = t.CategoryId,
                 BudgetAmount = t.BudgetAmount,
-                BudgetName = "", // optional tên theo category?
+                BudgetName = "", // Optional: Tên theo category?
                 BudgetPeriod = dto.BudgetPeriod,
                 StartDate = dto.StartDate,
                 EndDate = dto.EndDate,
@@ -301,9 +303,8 @@ namespace WebApplication4.Services
                 b.BudgetAmount = update.BudgetAmount;
                 b.AlertThreshold = update.AlertThreshold;
                 b.IsActive = update.IsActive;
-                b.UpdatedAt = DateTime.UtcNow; // Nên dùng UtcNow
+                b.UpdatedAt = DateTime.UtcNow;
 
-                // Add to result
                 updatedBudgets.Add(new BudgetDto
                 {
                     BudgetId = b.BudgetId,
@@ -325,15 +326,13 @@ namespace WebApplication4.Services
 
         public async Task<List<BudgetAlertDto>> GetBudgetAlertsAsync(int userId)
         {
-            var today = DateTime.Now.Date; // Chỉ lấy ngày, bỏ giờ phút giây
-
-            Console.WriteLine($"Today (Date only): {today}");
+            var today = DateTime.UtcNow.Date;
 
             var alerts = await _context.Budgets
                 .Where(b => b.UserId == userId &&
                             b.IsActive &&
                             b.StartDate <= today &&
-                            b.EndDate >= today && // Bây giờ sẽ so sánh 31/05/2025 00:00:00 >= 31/05/2025 00:00:00 = TRUE
+                            b.EndDate >= today &&
                             (b.SpentAmount * 100m) / b.BudgetAmount >= b.AlertThreshold)
                 .Select(b => new BudgetAlertDto
                 {
@@ -348,6 +347,7 @@ namespace WebApplication4.Services
 
             return alerts;
         }
+
         public async Task<List<BudgetDto>> GetBudgetsByCategoryAsync(int userId, int categoryId)
         {
             var budgets = await _context.Budgets
@@ -370,14 +370,206 @@ namespace WebApplication4.Services
             return budgets;
         }
 
+        // ==================== NEW METHODS FOR ACCOUNT BALANCE ALERTS ====================
 
+        public async Task<List<AccountBalanceAlertDto>> GetAccountBalanceAlertsAsync(int userId)
+        {
+            var today = DateTime.UtcNow.Date;
+            var alerts = new List<AccountBalanceAlertDto>();
 
+            var totalBalance = await _context.Accounts
+                .Where(a => a.UserId == userId && a.IsActive)
+                .SumAsync(a => a.Balance);
 
+            var activeBudgets = await _context.Budgets
+                .Where(b => b.UserId == userId &&
+                            b.IsActive &&
+                            b.StartDate <= today &&
+                            b.EndDate >= today)
+                .ToListAsync();
 
+            var totalBudgetAmount = activeBudgets.Sum(b => b.BudgetAmount - b.SpentAmount);
 
+            if (totalBalance < totalBudgetAmount)
+            {
+                alerts.Add(new AccountBalanceAlertDto
+                {
+                    AlertType = "INSUFFICIENT_TOTAL_BALANCE",
+                    Message = $"Số dư tài khoản ({totalBalance:C}) không đủ để thực hiện tất cả budget đang hoạt động ({totalBudgetAmount:C})",
+                    TotalBalance = totalBalance,
+                    RequiredAmount = totalBudgetAmount,
+                    Shortage = totalBudgetAmount - totalBalance,
+                    BudgetDetails = activeBudgets.Select(b => new BudgetSummaryInfo
+                    {
+                        BudgetId = b.BudgetId,
+                        BudgetName = b.BudgetName,
+                        RemainingAmount = b.BudgetAmount - b.SpentAmount
+                    }).ToList()
+                });
+            }
 
+            var accounts = await _context.Accounts
+                .Where(a => a.UserId == userId && a.IsActive)
+                .ToListAsync();
 
+            foreach (var account in accounts)
+            {
+                var budgetPerAccount = accounts.Count > 0 ? totalBudgetAmount / accounts.Count : 0;
+
+                if (account.Balance < budgetPerAccount)
+                {
+                    alerts.Add(new AccountBalanceAlertDto
+                    {
+                        AlertType = "INSUFFICIENT_ACCOUNT_BALANCE",
+                        Message = $"Tài khoản '{account.AccountName}' có số dư thấp ({account.Balance:C}) so với budget dự kiến ({budgetPerAccount:C})",
+                        AccountId = account.AccountId,
+                        AccountName = account.AccountName,
+                        AccountBalance = account.Balance,
+                        RequiredAmount = budgetPerAccount,
+                        Shortage = budgetPerAccount - account.Balance
+                    });
+                }
+            }
+
+            foreach (var budget in activeBudgets)
+            {
+                var remainingAmount = budget.BudgetAmount - budget.SpentAmount;
+                var daysLeft = (budget.EndDate - today).Days;
+
+                if (daysLeft > 0)
+                {
+                    var dailyBudget = remainingAmount / daysLeft;
+                    var averageDailySpent = budget.SpentAmount / Math.Max(1, (today - budget.StartDate).Days);
+
+                    if (averageDailySpent > dailyBudget * 1.5m)
+                    {
+                        alerts.Add(new AccountBalanceAlertDto
+                        {
+                            AlertType = "BUDGET_OVERSPENDING_RISK",
+                            Message = $"Budget '{budget.BudgetName}' có nguy cơ vượt quá với tốc độ chi tiêu hiện tại",
+                            BudgetId = budget.BudgetId,
+                            BudgetName = budget.BudgetName,
+                            CurrentSpending = budget.SpentAmount,
+                            RemainingAmount = remainingAmount,
+                            DaysLeft = daysLeft,
+                            SuggestedDailyLimit = dailyBudget
+                        });
+                    }
+                }
+            }
+
+            return alerts;
+        }
+
+        public async Task<BudgetFeasibilityCheckDto> CheckBudgetFeasibilityAsync(int userId, CreateBudgetDto dto)
+        {
+            var result = new BudgetFeasibilityCheckDto
+            {
+                IsFeasible = true,
+                Warnings = new List<string>(),
+                Suggestions = new List<string>()
+            };
+
+            var totalBalance = await _context.Accounts
+    .Where(a => a.UserId == userId && a.IsActive)
+    .SumAsync(a => a.Balance); // 10000.00
+
+            var existingBudgets = await _context.Budgets
+                .Where(b => b.UserId == userId &&
+                            b.IsActive &&
+                            b.StartDate <= dto.EndDate &&
+                            b.EndDate >= dto.StartDate)
+                .SumAsync(b => b.BudgetAmount - b.SpentAmount); // 1000000.00
+
+            var totalRequiredAmount = existingBudgets + dto.BudgetAmount; // 1000000 + 1500000 = 2500000
+
+            if (totalBalance < totalRequiredAmount)
+            {
+                result.IsFeasible = false;
+                result.Warnings.Add($"Số dư tài khoản ({totalBalance:C}) không đủ để thực hiện budget này cùng với các budget khác ({totalRequiredAmount:C})");
+                result.Suggestions.Add($"Cần bổ sung thêm {totalRequiredAmount - totalBalance:C} vào tài khoản");
+            }
+            else if (totalBalance < totalRequiredAmount * 1.2m)
+            {
+                result.Warnings.Add("Số dư tài khoản ở mức thấp, nên cân nhắc giảm budget hoặc tăng thu nhập");
+                result.Suggestions.Add("Nên giữ ít nhất 20% số dư để ứng phó với chi phí bất ngờ");
+            }
+
+            var historicalSpending = await _context.Transactions
+                .Where(t => t.UserId == userId &&
+                            t.CategoryId == dto.CategoryId &&
+                            t.TransactionType == "Expense" &&
+                            t.TransactionDate >= DateTime.UtcNow.AddMonths(-3))
+                .AverageAsync(t => (decimal?)t.Amount) ?? 0;
+
+            if (historicalSpending > 0 && dto.BudgetAmount < historicalSpending * 0.8m)
+            {
+                result.Warnings.Add($"Budget đề xuất ({dto.BudgetAmount:C}) thấp hơn 80% chi tiêu trung bình 3 tháng qua ({historicalSpending:C})");
+                result.Suggestions.Add($"Cân nhắc tăng budget lên {historicalSpending:C} dựa trên lịch sử chi tiêu");
+            }
+
+            return result;
+        }
+
+        public async Task<FinancialOverviewDto> GetFinancialOverviewAsync(int userId)
+        {
+            var today = DateTime.UtcNow.Date;
+
+            var totalBalance = await _context.Accounts
+                .Where(a => a.UserId == userId && a.IsActive)
+                .SumAsync(a => a.Balance);
+
+            var activeBudgets = await _context.Budgets
+                .Where(b => b.UserId == userId &&
+                            b.IsActive &&
+                            b.StartDate <= today &&
+                            b.EndDate >= today)
+                .ToListAsync();
+
+            var totalBudget = activeBudgets.Sum(b => b.BudgetAmount);
+            var totalSpent = activeBudgets.Sum(b => b.SpentAmount);
+            var totalRemaining = totalBudget - totalSpent;
+
+            var monthlyIncome = await _context.Transactions
+                .Where(t => t.UserId == userId &&
+                            t.TransactionType == "Income" &&
+                            t.TransactionDate >= new DateTime(today.Year, today.Month, 1))
+                .SumAsync(t => t.Amount);
+
+            var monthlyExpense = await _context.Transactions
+                .Where(t => t.UserId == userId &&
+                            t.TransactionType == "Expense" &&
+                            t.TransactionDate >= new DateTime(today.Year, today.Month, 1))
+                .SumAsync(t => t.Amount);
+
+            return new FinancialOverviewDto
+            {
+                TotalBalance = totalBalance,
+                TotalBudget = totalBudget,
+                TotalSpent = totalSpent,
+                TotalRemaining = totalRemaining,
+                MonthlyIncome = monthlyIncome,
+                MonthlyExpense = monthlyExpense,
+                MonthlyNetIncome = monthlyIncome - monthlyExpense,
+                BudgetUtilizationRate = totalBudget > 0 ? (double)(totalSpent / totalBudget) * 100 : 0,
+                FinancialHealthScore = CalculateFinancialHealthScore(totalBalance, totalRemaining, monthlyIncome, monthlyExpense)
+            };
+        }
+
+        private double CalculateFinancialHealthScore(decimal totalBalance, decimal totalRemaining, decimal monthlyIncome, decimal monthlyExpense)
+        {
+            double score = 100;
+
+            if (totalBalance < monthlyExpense * 2) score -= 30;
+            else if (totalBalance < monthlyExpense * 3) score -= 15;
+
+            if (totalRemaining < totalBalance * 0.1m) score -= 25;
+            else if (totalRemaining < totalBalance * 0.2m) score -= 15;
+
+            if (monthlyExpense > monthlyIncome) score -= 40;
+            else if (monthlyExpense > monthlyIncome * 0.9m) score -= 20;
+
+            return Math.Max(0, Math.Min(100, score));
+        }
     }
-
-
 }

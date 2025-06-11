@@ -14,12 +14,27 @@ builder.Services.AddDbContext<AppDbContext>(options =>
         ServerVersion.AutoDetect(builder.Configuration.GetConnectionString("DefaultConnection"))
     ));
 
-// 👉 2. Cấu hình JWT
+// 👉 2. Cấu hình CORS - THÊM MỚI
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowReactApp", policy =>
+    {
+        policy
+            .WithOrigins("http://localhost:3000") // React app URL
+            .AllowAnyMethod()
+            .AllowAnyHeader()
+            .AllowCredentials();
+    });
+});
+
+// 👉 3. Cấu hình JWT
 var jwtSettings = builder.Configuration.GetSection("Jwt");
 var key = Encoding.ASCII.GetBytes(jwtSettings["Key"]);
+
 builder.Services.AddScoped<IAccountService, AccountService>();
 builder.Services.AddScoped<TransactionService>();
 builder.Services.AddScoped<IBudgetService, BudgetService>();
+
 builder.Services.AddAuthentication(options =>
 {
     options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
@@ -33,38 +48,33 @@ builder.Services.AddAuthentication(options =>
     {
         ValidateIssuer = true,
         ValidIssuer = jwtSettings["Issuer"],
-
         ValidateAudience = true,
         ValidAudience = jwtSettings["Audience"],
-
         ValidateIssuerSigningKey = true,
         IssuerSigningKey = new SymmetricSecurityKey(key),
-
         ValidateLifetime = true,
         ClockSkew = TimeSpan.Zero
     };
 });
-//builder.Services.AddScoped<AccountService, AccountService>();
 
-// 👉 3. Add Controllers & Swagger
+// 👉 4. Add Services
 builder.Services.AddScoped<IDashboardService, DashboardService>();
-
-builder.Services.AddScoped<IDashboardService, DashboardService>();
-builder.Services.AddScoped<IBudgetService, BudgetService>();
+builder.Services.AddScoped<IGoalService, GoalService>();
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
-builder.Services.AddScoped<IGoalService, GoalService>();
+
 var app = builder.Build();
 
-// Bỏ điều kiện if, cho phép Swagger chạy luôn
-// Xóa điều kiện if, để Swagger luôn chạy
+// 👉 5. Configure Pipeline
 app.UseSwagger();
 app.UseSwaggerUI();
 
-app.UseHttpsRedirection();
+// ⚠️ QUAN TRỌNG: UseCors() phải đặt trước UseAuthentication()
+app.UseCors("AllowReactApp");
 
-app.UseAuthentication(); // ⚠️ Authentication trước Authorization
+app.UseHttpsRedirection();
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();

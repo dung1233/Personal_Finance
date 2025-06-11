@@ -17,7 +17,9 @@ namespace WebApplication4.Services
         Task<List<BudgetAlertDto>> GetBudgetAlertsAsync(int userId);
 
         Task<List<BudgetDto>> GetBudgetsByCategoryAsync(int userId, int categoryId);
-
+        Task<List<AccountBalanceAlertDto>> GetAccountBalanceAlertsAsync(int userId);
+        Task<BudgetFeasibilityCheckDto> CheckBudgetFeasibilityAsync(int userId, CreateBudgetDto dto);
+        Task<FinancialOverviewDto> GetFinancialOverviewAsync(int userId);
 
     }
 
