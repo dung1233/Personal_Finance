@@ -7,20 +7,24 @@ using WebApplication4.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// 👉 1. Add DbContext (MySQL)
-builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseMySql(
-        builder.Configuration.GetConnectionString("DefaultConnection"),
-        ServerVersion.AutoDetect(builder.Configuration.GetConnectionString("DefaultConnection"))
-    ));
+// 👉 1. Hard-code connection string để test
+var connectionString = "server=localhost;port=3306;database=personalfinancedb;user=root;password=;AllowZeroDateTime=True;ConvertZeroDateTime=True;";
 
-// 👉 2. Cấu hình CORS - THÊM MỚI
+builder.Services.AddDbContext<AppDbContext>(options =>
+    options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString)));
+
+// Hoặc nếu muốn dùng từ appsettings thì dùng cách này:
+// var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") + "AllowZeroDateTime=True;ConvertZeroDateTime=True;";
+// builder.Services.AddDbContext<AppDbContext>(options =>
+//     options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString)));
+
+// 👉 2. Cấu hình CORS
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowReactApp", policy =>
     {
         policy
-            .WithOrigins("http://localhost:3000") // React app URL
+            .WithOrigins("http://localhost:3000")
             .AllowAnyMethod()
             .AllowAnyHeader()
             .AllowCredentials();
@@ -60,6 +64,11 @@ builder.Services.AddAuthentication(options =>
 // 👉 4. Add Services
 builder.Services.AddScoped<IDashboardService, DashboardService>();
 builder.Services.AddScoped<IGoalService, GoalService>();
+builder.Services.AddScoped<IDebtService, DebtService>();
+builder.Services.AddScoped<ILoanService, LoansService>();
+// ⭐ Thêm HttpContextAccessor
+builder.Services.AddHttpContextAccessor();
+
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
@@ -70,13 +79,10 @@ var app = builder.Build();
 app.UseSwagger();
 app.UseSwaggerUI();
 
-// ⚠️ QUAN TRỌNG: UseCors() phải đặt trước UseAuthentication()
 app.UseCors("AllowReactApp");
-
 app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
-
 app.MapControllers();
 
 app.Run();

@@ -196,9 +196,5 @@ namespace WebApplication4.Controllers
             var overview = await _budgetService.GetFinancialOverviewAsync(userId.Value);
             return Ok(overview);
         }
-
-
-
-
     }
 }

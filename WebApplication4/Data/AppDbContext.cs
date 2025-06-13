@@ -15,11 +15,16 @@ namespace WebApplication4.Data
         public DbSet<Budget> Budgets { get; set; }
         public DbSet<Goal> Goals { get; set; }
         public DbSet<GoalContribution> GoalContributions { get; set; }
+        public DbSet<Loan> Loans { get; set; }
+        public DbSet<LoanPayment> LoanPayments { get; set; }
+        public DbSet<Debt> Debts { get; set; }
+        public DbSet<DebtPayment> DebtPayments { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
 
+            // Cấu hình cho Goal entity
             modelBuilder.Entity<Goal>(entity =>
             {
                 // Chuyển enum GoalType sang string varchar(50)
@@ -35,9 +40,21 @@ namespace WebApplication4.Data
                     .HasMaxLength(20)
                     .IsRequired()
                     .HasDefaultValue(GoalPriority.Medium);
-
-                // Cấu hình thêm cho các trường khác nếu cần
             });
+
+            // Cấu hình cho Debt entity
+            modelBuilder.Entity<Debt>()
+                .HasKey(d => d.DebtId);
+
+            // Cấu hình cho DebtPayment entity
+            modelBuilder.Entity<DebtPayment>()
+                .HasKey(p => p.PaymentId);
+
+            // Cấu hình mối quan hệ giữa Debt và DebtPayment
+            modelBuilder.Entity<Debt>()
+                .HasMany(d => d.Payments)
+                .WithOne(p => p.Debt)
+                .HasForeignKey(p => p.DebtId);
         }
     }
 }
