@@ -65,11 +65,20 @@ builder.Services.AddAuthentication(options =>
 builder.Services.AddScoped<IDashboardService, DashboardService>();
 builder.Services.AddScoped<IGoalService, GoalService>();
 builder.Services.AddScoped<IDebtService, DebtService>();
-builder.Services.AddScoped<ILoanService, LoansService>();
+
 // ⭐ Thêm HttpContextAccessor
 builder.Services.AddHttpContextAccessor();
 
+// Trước:
 builder.Services.AddControllers();
+
+// Sau:
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
+    });
+
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 

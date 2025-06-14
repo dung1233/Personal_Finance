@@ -1,22 +1,15 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace WebApplication4.Models
 {
-    public enum DebtType
-    {
-        CreditCard,
-        StudentLoan,
-        Mortgage,
-        PersonalLoan,
-        AutoLoan,
-        Other
-    }
+
+
 
     public class Debt
     {
-        [Key]
         public int DebtId { get; set; }
         public int UserId { get; set; }
         public string DebtName { get; set; } = null!;
@@ -29,10 +22,13 @@ namespace WebApplication4.Models
         public int? PaymentDueDate { get; set; }
         public DateTime? NextPaymentDate { get; set; }
         public DateTime? PayoffDate { get; set; }
-        public bool IsActive { get; set; } = true;
+        public int? AccountId { get; set; } // Thêm AccountId
+        public bool IsActive { get; set; }
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }
 
-        public List<DebtPayment> Payments { get; set; } = new();
+        public User User { get; set; } = null!;
+        public Account? Account { get; set; } // Navigation property
+        public ICollection<DebtPayment> DebtPayments { get; set; } = new List<DebtPayment>();
     }
 }

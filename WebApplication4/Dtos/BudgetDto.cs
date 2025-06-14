@@ -12,6 +12,10 @@
         public decimal AlertThreshold { get; set; }
         public bool IsActive { get; set; }
         public int CategoryId { get; set; }
+
     }
+
+ 
+
 
 }

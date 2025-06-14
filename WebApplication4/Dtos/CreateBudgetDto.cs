@@ -24,6 +24,7 @@ namespace WebApplication4.Dtos
         public decimal AlertThreshold { get; set; } = 80m;
 
         public int CategoryId { get; set; }
+        public int AccountId { get; set; }
     }
 
 }

@@ -16,22 +16,38 @@ namespace WebApplication4.Services
 
         public async Task<BudgetDto?> CreateBudgetAsync(int userId, CreateBudgetDto dto)
         {
+            // Kiểm tra StartDate và EndDate
             if (dto.StartDate >= dto.EndDate)
-                return null;
+                throw new ArgumentException("Ngày bắt đầu phải nhỏ hơn ngày kết thúc.");
 
+            // Kiểm tra tài khoản hợp lệ
+            var account = await _context.Accounts
+                .FirstOrDefaultAsync(a => a.AccountId == dto.AccountId && a.UserId == userId && a.IsActive);
+            if (account == null)
+                throw new ArgumentException("Tài khoản không hợp lệ hoặc không tồn tại.");
+
+            // Kiểm tra tổng ngân sách
+            var totalBudget = await _context.Budgets
+                .Where(b => b.UserId == userId && b.AccountId == dto.AccountId && b.IsActive)
+                .SumAsync(b => b.BudgetAmount);
+            if (totalBudget + dto.BudgetAmount > account.Balance)
+                throw new ArgumentException("Tổng ngân sách vượt quá số dư tài khoản.");
+
+            // Kiểm tra overlap
             var isOverlap = await _context.Budgets.AnyAsync(b =>
                 b.UserId == userId &&
                 b.CategoryId == dto.CategoryId &&
                 b.IsActive &&
                 b.StartDate < dto.EndDate &&
                 b.EndDate > dto.StartDate);
-
             if (isOverlap)
-                return null;
+                throw new ArgumentException("Khoảng thời gian ngân sách trùng lặp với ngân sách hiện có cho danh mục này.");
 
+            // Tạo ngân sách mới
             var budget = new Budget
             {
                 UserId = userId,
+                AccountId = dto.AccountId,
                 CategoryId = dto.CategoryId,
                 BudgetName = dto.BudgetName,
                 BudgetAmount = dto.BudgetAmount,
@@ -48,6 +64,7 @@ namespace WebApplication4.Services
             _context.Budgets.Add(budget);
             await _context.SaveChangesAsync();
 
+            // Tạo DTO để trả về
             return new BudgetDto
             {
                 BudgetId = budget.BudgetId,

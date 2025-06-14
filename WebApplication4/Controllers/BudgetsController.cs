@@ -43,9 +43,19 @@ namespace WebApplication4.Controllers
             var userId = GetUserIdFromClaims();
             if (userId == null) return Unauthorized("Invalid token or missing user ID");
 
-            var budget = await _budgetService.CreateBudgetAsync(userId.Value, dto);
-            if (budget == null) return BadRequest("Invalid budget data or overlapping periods");
-            return CreatedAtAction(nameof(GetBudget), new { id = budget.BudgetId }, budget);
+            try
+            {
+                var budget = await _budgetService.CreateBudgetAsync(userId.Value, dto);
+                return CreatedAtAction(nameof(GetBudget), new { id = budget.BudgetId }, budget);
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new { error = ex.Message });
+            }
+            catch (Exception)
+            {
+                return StatusCode(500, new { error = "Đã xảy ra lỗi không mong muốn." });
+            }
         }
 
         [HttpPut("{id}")]

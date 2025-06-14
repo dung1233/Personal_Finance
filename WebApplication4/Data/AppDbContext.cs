@@ -52,7 +52,7 @@ namespace WebApplication4.Data
 
             // Cấu hình mối quan hệ giữa Debt và DebtPayment
             modelBuilder.Entity<Debt>()
-                .HasMany(d => d.Payments)
+                .HasMany(d => d.DebtPayments)
                 .WithOne(p => p.Debt)
                 .HasForeignKey(p => p.DebtId);
         }

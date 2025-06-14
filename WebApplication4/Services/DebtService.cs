@@ -1,4 +1,9 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using MySqlConnector;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 using WebApplication4.Data;
 using WebApplication4.Dtos;
 using WebApplication4.Models;
@@ -14,10 +19,11 @@ namespace WebApplication4.Services
             _context = context;
         }
 
-        public async Task<List<DebtResponseDto>> GetAllDebtsAsync(int userId)
+        // Giữ nguyên các phương thức hiện có
+        public async Task<List<DebtResponseDto>> GetDebtsAsync(int userId)
         {
             return await _context.Debts
-                .Where(d => d.UserId == userId)
+                .Where(d => d.UserId == userId && d.IsActive)
                 .Select(d => new DebtResponseDto
                 {
                     DebtId = d.DebtId,
@@ -32,27 +38,20 @@ namespace WebApplication4.Services
                     NextPaymentDate = d.NextPaymentDate,
                     PayoffDate = d.PayoffDate,
                     IsActive = d.IsActive
-                }).ToListAsync();
+                })
+                .ToListAsync();
         }
 
-        public async Task<DebtDetailResponseDto?> GetDebtByIdAsync(int userId, int debtId)
+        public async Task<DebtDetailResponseDto> GetDebtByIdAsync(int debtId, int userId)
         {
             var debt = await _context.Debts
-                .FirstOrDefaultAsync(d => d.DebtId == debtId && d.UserId == userId);
-            if (debt == null) return null;
+                .Include(d => d.DebtPayments)
+                .FirstOrDefaultAsync(d => d.DebtId == debtId && d.UserId == userId && d.IsActive);
 
-            var payments = await _context.DebtPayments
-                .Where(p => p.DebtId == debtId)
-                .OrderByDescending(p => p.PaymentDate)
-                .Select(p => new DebtPaymentDto
-                {
-                    PaymentId = p.PaymentId,
-                    PaymentAmount = p.PaymentAmount,
-                    PrincipalAmount = p.PrincipalAmount,
-                    InterestAmount = p.InterestAmount,
-                    PaymentDate = p.PaymentDate,
-                    Notes = p.Notes
-                }).ToListAsync();
+            if (debt == null)
+            {
+                throw new KeyNotFoundException("Debt not found or inactive.");
+            }
 
             return new DebtDetailResponseDto
             {
@@ -68,121 +67,209 @@ namespace WebApplication4.Services
                 NextPaymentDate = debt.NextPaymentDate,
                 PayoffDate = debt.PayoffDate,
                 IsActive = debt.IsActive,
-                Payments = payments
+                PaymentHistory = debt.DebtPayments.Select(p => new DebtPaymentDto
+                {
+                    PaymentId = p.PaymentId,
+                    PaymentAmount = p.PaymentAmount,
+                    PaymentDate = p.PaymentDate,
+                    PrincipalAmount = p.PrincipalAmount,
+                    InterestAmount = p.InterestAmount,
+                    Notes = p.Notes
+                }).ToList()
             };
         }
 
-        public async Task<DebtResponseDto> CreateDebtAsync(int userId, CreateDebtRequestDto dto)
+        private static readonly HashSet<string> ValidDebtTypes = new HashSet<string>
         {
+            "Credit Card", "Student Loan", "Mortgage", "Personal Loan", "Auto Loan", "Other"
+        };
+
+        public async Task CreateDebtAsync(CreateDebtRequestDto request, int userId)
+        {
+            if (!ValidDebtTypes.Contains(request.DebtType))
+                throw new ArgumentException("Invalid DebtType.");
+
+            if (request.AccountId.HasValue)
+            {
+                var account = await _context.Accounts
+                    .FirstOrDefaultAsync(a => a.AccountId == request.AccountId && a.UserId == userId && a.IsActive);
+                if (account == null)
+                    throw new ArgumentException("Invalid or inactive account.");
+                if (request.MinimumPayment.HasValue && account.Balance < request.MinimumPayment.Value)
+                    throw new ArgumentException("Insufficient account balance for minimum payment.");
+            }
+
             var debt = new Debt
             {
                 UserId = userId,
-                DebtName = dto.DebtName,
-                DebtType = dto.DebtType,
-                Creditor = dto.Creditor,
-                OriginalAmount = dto.OriginalAmount,
-                CurrentBalance = dto.CurrentBalance,
-                InterestRate = dto.InterestRate,
-                MinimumPayment = dto.MinimumPayment,
-                PaymentDueDate = dto.PaymentDueDate,
-                NextPaymentDate = dto.NextPaymentDate,
-                PayoffDate = dto.PayoffDate,
-                IsActive = true
+                DebtName = request.DebtName,
+                DebtType = request.DebtType,
+                Creditor = request.Creditor,
+                OriginalAmount = request.OriginalAmount,
+                CurrentBalance = request.CurrentBalance,
+                InterestRate = request.InterestRate,
+                MinimumPayment = request.MinimumPayment,
+                PaymentDueDate = request.PaymentDueDate,
+                NextPaymentDate = request.NextPaymentDate,
+                PayoffDate = request.PayoffDate,
+                AccountId = request.AccountId,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
             };
 
             _context.Debts.Add(debt);
             await _context.SaveChangesAsync();
+        }
 
-            return new DebtResponseDto
+        public async Task UpdateDebtAsync(int debtId, UpdateDebtRequestDto request, int userId)
+        {
+            if (request.DebtType != null && !ValidDebtTypes.Contains(request.DebtType))
+                throw new ArgumentException("Invalid DebtType.");
+
+            var debt = await _context.Debts
+                .FirstOrDefaultAsync(d => d.DebtId == debtId && d.UserId == userId && d.IsActive);
+
+            if (debt == null)
+                throw new KeyNotFoundException("Debt not found or inactive.");
+
+            if (request.AccountId.HasValue)
             {
-                DebtId = debt.DebtId,
-                DebtName = debt.DebtName,
-                DebtType = debt.DebtType,
-                Creditor = debt.Creditor,
-                OriginalAmount = debt.OriginalAmount,
-                CurrentBalance = debt.CurrentBalance,
-                InterestRate = debt.InterestRate,
-                MinimumPayment = debt.MinimumPayment,
-                PaymentDueDate = debt.PaymentDueDate,
-                NextPaymentDate = debt.NextPaymentDate,
-                PayoffDate = debt.PayoffDate,
-                IsActive = debt.IsActive
-            };
+                var account = await _context.Accounts
+                    .FirstOrDefaultAsync(a => a.AccountId == request.AccountId && a.UserId == userId && a.IsActive);
+                if (account == null)
+                    throw new ArgumentException("Invalid or inactive account.");
+                if (request.MinimumPayment.HasValue && account.Balance < request.MinimumPayment.Value)
+                    throw new ArgumentException("Insufficient account balance for minimum payment.");
+            }
+
+            debt.DebtName = request.DebtName ?? debt.DebtName;
+            debt.DebtType = request.DebtType ?? debt.DebtType;
+            debt.Creditor = request.Creditor ?? debt.Creditor;
+            debt.InterestRate = request.InterestRate ?? debt.InterestRate;
+            debt.MinimumPayment = request.MinimumPayment ?? debt.MinimumPayment;
+            debt.PaymentDueDate = request.PaymentDueDate ?? debt.PaymentDueDate;
+            debt.NextPaymentDate = request.NextPaymentDate ?? debt.NextPaymentDate;
+            debt.PayoffDate = request.PayoffDate ?? debt.PayoffDate;
+            debt.AccountId = request.AccountId ?? debt.AccountId;
+            debt.UpdatedAt = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
         }
 
-        public async Task<DebtResponseDto?> UpdateDebtAsync(int userId, int debtId, UpdateDebtRequestDto dto)
+        public async Task DeleteDebtAsync(int debtId, int userId)
+        {
+            var debt = await _context.Debts
+                .FirstOrDefaultAsync(d => d.DebtId == debtId && d.UserId == userId && d.IsActive);
+
+            if (debt == null)
+                throw new KeyNotFoundException("Debt not found or already deleted.");
+
+            debt.IsActive = false;
+            debt.UpdatedAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+        }
+
+        public async Task ActivateDebtAsync(int debtId, bool activate, int userId)
         {
             var debt = await _context.Debts
                 .FirstOrDefaultAsync(d => d.DebtId == debtId && d.UserId == userId);
-            if (debt == null) return null;
 
-            debt.DebtName = dto.DebtName;
-            debt.DebtType = dto.DebtType;
-            debt.Creditor = dto.Creditor;
-            debt.OriginalAmount = dto.OriginalAmount;
-            debt.CurrentBalance = dto.CurrentBalance;
-            debt.InterestRate = dto.InterestRate;
-            debt.MinimumPayment = dto.MinimumPayment;
-            debt.PaymentDueDate = dto.PaymentDueDate;
-            debt.NextPaymentDate = dto.NextPaymentDate;
-            debt.PayoffDate = dto.PayoffDate;
-            debt.IsActive = dto.IsActive;
+            if (debt == null)
+                throw new KeyNotFoundException("Debt not found.");
 
+            debt.IsActive = activate;
+            debt.UpdatedAt = DateTime.UtcNow;
             await _context.SaveChangesAsync();
-
-            return new DebtResponseDto
-            {
-                DebtId = debt.DebtId,
-                DebtName = debt.DebtName,
-                DebtType = debt.DebtType,
-                Creditor = debt.Creditor,
-                OriginalAmount = debt.OriginalAmount,
-                CurrentBalance = debt.CurrentBalance,
-                InterestRate = debt.InterestRate,
-                MinimumPayment = debt.MinimumPayment,
-                PaymentDueDate = debt.PaymentDueDate,
-                NextPaymentDate = debt.NextPaymentDate,
-                PayoffDate = debt.PayoffDate,
-                IsActive = debt.IsActive
-            };
-        }
-
-        public async Task<bool> DeleteDebtAsync(int userId, int debtId)
-        {
-            var debt = await _context.Debts
-                .FirstOrDefaultAsync(d => d.DebtId == debtId && d.UserId == userId);
-            if (debt == null) return false;
-
-            _context.Debts.Remove(debt);
-            await _context.SaveChangesAsync();
-            return true;
-        }
-
-        public async Task<bool> ToggleDebtActiveStatusAsync(int userId, int debtId)
-        {
-            var debt = await _context.Debts
-                .FirstOrDefaultAsync(d => d.DebtId == debtId && d.UserId == userId);
-            if (debt == null) return false;
-
-            debt.IsActive = !debt.IsActive;
-            await _context.SaveChangesAsync();
-            return true;
         }
 
         public async Task<DebtSummaryResponseDto> GetDebtSummaryAsync(int userId)
         {
-            var debts = await _context.Debts
-                .Where(d => d.UserId == userId)
-                .ToListAsync();
+            var summary = await _context.Debts
+                .Where(d => d.UserId == userId && d.IsActive)
+                .GroupBy(d => 1)
+                .Select(g => new DebtSummaryResponseDto
+                {
+                    TotalDebts = g.Count(),
+                    TotalOriginalAmount = g.Sum(d => d.OriginalAmount),
+                    TotalCurrentBalance = g.Sum(d => d.CurrentBalance),
+                    TotalMinimumPayment = g.Sum(d => d.MinimumPayment ?? 0),
+                    TotalInterestPaid = _context.DebtPayments
+                        .Where(p => p.Debt.UserId == userId && p.Debt.IsActive)
+                        .Sum(p => p.InterestAmount ?? 0),
+                    ActiveDebts = g.Select(d => new DebtResponseDto
+                    {
+                        DebtId = d.DebtId,
+                        DebtName = d.DebtName,
+                        DebtType = d.DebtType,
+                        Creditor = d.Creditor,
+                        OriginalAmount = d.OriginalAmount,
+                        CurrentBalance = d.CurrentBalance,
+                        InterestRate = d.InterestRate,
+                        MinimumPayment = d.MinimumPayment,
+                        PaymentDueDate = d.PaymentDueDate,
+                        NextPaymentDate = d.NextPaymentDate,
+                        PayoffDate = d.PayoffDate,
+                        IsActive = d.IsActive
+                    }).ToList()
+                })
+                .FirstOrDefaultAsync();
 
-            return new DebtSummaryResponseDto
+            if (summary == null)
             {
-                TotalDebts = debts.Count,
-                TotalOriginalAmount = debts.Sum(d => d.OriginalAmount),
-                TotalCurrentBalance = debts.Sum(d => d.CurrentBalance),
-                TotalMonthlyPayment = debts.Sum(d => d.MinimumPayment ?? 0)
+                summary = new DebtSummaryResponseDto
+                {
+                    TotalDebts = 0,
+                    TotalOriginalAmount = 0,
+                    TotalCurrentBalance = 0,
+                    TotalMinimumPayment = 0,
+                    TotalInterestPaid = 0,
+                    ActiveDebts = new List<DebtResponseDto>()
+                };
+            }
+
+            summary.DebtToIncomeRatio = await CalculateDebtToIncomeRatioAsync(userId);
+            return summary;
+        }
+
+        private async Task<decimal> CalculateDebtToIncomeRatioAsync(int userId)
+        {
+            var totalMonthlyPayment = await _context.Debts
+                .Where(d => d.UserId == userId && d.IsActive)
+                .SumAsync(d => d.MinimumPayment ?? 0);
+            var monthlyIncome = await _context.Transactions
+                .Where(t => t.UserId == userId && t.TransactionType == "Income" && t.TransactionDate >= DateTime.UtcNow.AddMonths(-1))
+                .SumAsync(t => t.Amount);
+            return monthlyIncome > 0 ? totalMonthlyPayment / monthlyIncome * 100 : 0;
+        }
+
+        // Thêm phương thức mới để xử lý thanh toán nợ
+        public async Task ProcessDebtPaymentAsync(int debtId, ProcessDebtPaymentRequestDto request, int userId)
+        {
+            var debt = await _context.Debts
+                .FirstOrDefaultAsync(d => d.DebtId == debtId && d.UserId == userId && d.IsActive);
+            if (debt == null)
+                throw new KeyNotFoundException("Debt not found or inactive.");
+
+            var parameters = new[]
+            {
+                new MySqlParameter("@p_DebtId", debtId),
+                new MySqlParameter("@p_PaymentDate", request.PaymentDate),
+                new MySqlParameter("@p_PaymentAmount", request.PaymentAmount)
             };
+
+            try
+            {
+                await _context.Database.ExecuteSqlRawAsync(
+                    "CALL ProcessDebtPayment(@p_DebtId, @p_PaymentDate, @p_PaymentAmount)",
+                    parameters);
+            }
+            catch (MySqlException ex)
+            {
+                throw new Exception($"Failed to process payment: {ex.Message}");
+            }
         }
     }
 
+   
 }
