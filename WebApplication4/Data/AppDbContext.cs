@@ -19,7 +19,8 @@ namespace WebApplication4.Data
         public DbSet<LoanPayment> LoanPayments { get; set; }
         public DbSet<Debt> Debts { get; set; }
         public DbSet<DebtPayment> DebtPayments { get; set; }
-
+        public DbSet<Loan> Loan { get; set; }
+        public DbSet<LoanPayment> LoanPayment { get; set; }
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
