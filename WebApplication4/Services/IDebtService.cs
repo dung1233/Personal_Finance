@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System.Collections;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using WebApplication4.Dtos;
 
@@ -14,5 +15,7 @@ namespace WebApplication4.Services
         Task ActivateDebtAsync(int debtId, bool activate, int userId);
         Task<DebtSummaryResponseDto> GetDebtSummaryAsync(int userId);
         Task ProcessDebtPaymentAsync(int debtId, ProcessDebtPaymentRequestDto request, int userId);
+        Task<IEnumerable> GetDebtDueNotificationsAsync(int userId, int days);
     }
 }
+    

@@ -1,6 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using MySqlConnector;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -268,6 +269,30 @@ namespace WebApplication4.Services
             {
                 throw new Exception($"Failed to process payment: {ex.Message}");
             }
+        }
+
+        public async Task<IEnumerable> GetDebtDueNotificationsAsync(int userId, int days)
+        {
+            var currentDate = DateTime.UtcNow.Date;
+            var dueDateLimit = currentDate.AddDays(days);
+
+            var debts = await _context.Debts
+                .Where(d => d.UserId == userId && d.IsActive && d.NextPaymentDate.HasValue && d.NextPaymentDate.Value <= dueDateLimit)
+                .Select(d => new DebtDueNotificationDto
+                {
+                    DebtId = d.DebtId,
+                    DebtName = d.DebtName,
+                    Creditor = d.Creditor,
+                    NextPaymentDate = d.NextPaymentDate.Value, // Explicitly cast Nullable<DateTime> to DateTime
+                    MinimumPayment = d.MinimumPayment ?? 0,
+                    CurrentBalance = d.CurrentBalance,
+                    NotificationMessage = d.NextPaymentDate.Value.Date < currentDate
+                        ? $"Overdue: Your payment of {d.MinimumPayment ?? 0:N2} VND for {d.DebtName} was due on {d.NextPaymentDate.Value:yyyy-MM-dd}."
+                        : $"Reminder: Your payment of {d.MinimumPayment ?? 0:N2} VND for {d.DebtName} is due on {d.NextPaymentDate.Value:yyyy-MM-dd}."
+                })
+                .ToListAsync();
+
+            return debts;
         }
     }
 

@@ -147,6 +147,13 @@ namespace WebApplication4.Controllers
                 return BadRequest(ex.Message);
             }
         }
+        [HttpGet("due-notifications")]
+        public async Task<ActionResult<IEnumerable<DebtDueNotificationDto>>> GetDebtDueNotifications([FromQuery] int days = 7)
+        {
+            int userId = GetUserId();
+            var notifications = await _debtService.GetDebtDueNotificationsAsync(userId, days);
+            return Ok(notifications);
+        }
 
         private int GetUserId()
         {
