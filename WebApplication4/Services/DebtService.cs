@@ -121,6 +121,19 @@ namespace WebApplication4.Services
 
             _context.Debts.Add(debt);
             await _context.SaveChangesAsync();
+
+            // Nếu có AccountId, cộng tiền vào tài khoản
+            if (request.AccountId.HasValue)
+            {
+                var account = await _context.Accounts
+                    .FirstOrDefaultAsync(a => a.AccountId == request.AccountId && a.UserId == userId && a.IsActive);
+                if (account != null)
+                {
+                    account.Balance += request.OriginalAmount;
+                    account.UpdatedAt = DateTime.UtcNow;
+                    await _context.SaveChangesAsync();
+                }
+            }
         }
 
         public async Task UpdateDebtAsync(int debtId, UpdateDebtRequestDto request, int userId)

@@ -21,6 +21,7 @@ namespace WebApplication4.Data
         public DbSet<DebtPayment> DebtPayments { get; set; }
         public DbSet<Loan> Loan { get; set; }
         public DbSet<LoanPayment> LoanPayment { get; set; }
+        public DbSet<Investment> Investments { get; set; }
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
@@ -56,6 +57,14 @@ namespace WebApplication4.Data
                 .HasMany(d => d.DebtPayments)
                 .WithOne(p => p.Debt)
                 .HasForeignKey(p => p.DebtId);
+
+            // Cấu hình cho Investment entity: enum InvestmentType lưu đúng giá trị EnumMember
+            modelBuilder.Entity<Investment>()
+                .Property(e => e.InvestmentType)
+                .HasConversion(
+                    v => v.GetEnumMemberValue(),
+                    v => v.ToEnumFromEnumMemberValue<InvestmentType>()
+                );
         }
     }
 }

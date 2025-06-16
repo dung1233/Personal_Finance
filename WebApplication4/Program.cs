@@ -39,6 +39,7 @@ builder.Services.AddScoped<IAccountService, AccountService>();
 builder.Services.AddScoped<TransactionService>();
 builder.Services.AddScoped<IBudgetService, BudgetService>();
 builder.Services.AddScoped<ILoanService, LoanService>();
+builder.Services.AddScoped<IInvestmentService, InvestmentService>();
 builder.Services.AddAuthentication(options =>
 {
     options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
