@@ -36,5 +36,8 @@ namespace WebApplication4.Models
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+
+        public string? EmailActivationCode { get; set; }
+        public DateTime? EmailActivationCodeExpires { get; set; }
     }
 }

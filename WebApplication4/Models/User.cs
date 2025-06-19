@@ -29,6 +29,9 @@ namespace WebApplication4.Models
 
         public bool IsEmailVerified { get; set; } = false;
 
+        public string? EmailActivationCode { get; set; }
+        public DateTime? EmailActivationCodeExpires { get; set; }
+
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
         public DateTime? UpdatedAt { get; set; }

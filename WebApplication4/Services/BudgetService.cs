@@ -212,15 +212,29 @@ namespace WebApplication4.Services
                 .Where(b => b.UserId == userId && b.IsActive)
                 .ToListAsync();
 
-            var summaries = budgets.Select(b => new BudgetSummaryDto
+            var summaries = new List<BudgetSummaryDto>();
+
+            foreach (var b in budgets)
             {
-                BudgetId = b.BudgetId,
-                BudgetName = b.BudgetName,
-                BudgetAmount = b.BudgetAmount,
-                SpentAmount = b.SpentAmount,
-                AlertThreshold = b.AlertThreshold,
-                IsAlert = b.SpentAmount >= (b.BudgetAmount * b.AlertThreshold / 100m)
-            }).ToList();
+                // Tính tổng chi tiêu thực tế cho ngân sách này
+                var spent = await _context.Transactions
+                    .Where(t => t.UserId == userId
+                        && t.CategoryId == b.CategoryId
+                        && t.TransactionType == "Expense"
+                        && t.TransactionDate >= b.StartDate
+                        && t.TransactionDate <= b.EndDate)
+                    .SumAsync(t => t.Amount);
+
+                summaries.Add(new BudgetSummaryDto
+                {
+                    BudgetId = b.BudgetId,
+                    BudgetName = b.BudgetName,
+                    BudgetAmount = b.BudgetAmount,
+                    SpentAmount = spent,
+                    AlertThreshold = b.AlertThreshold,
+                    IsAlert = spent >= (b.BudgetAmount * b.AlertThreshold / 100m)
+                });
+            }
 
             return summaries;
         }
